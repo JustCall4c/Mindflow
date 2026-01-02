@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindflow - 你的心流日记</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Nunito:wght@400;600&display=swap');
+
+        :root {
+            --color-bg: #F5F0EB;
+            --color-card: #FFFFFF;
+            --color-text-main: #4B3621;
+            --color-text-sub: #8D7B68;
+            --color-btn: #6F4E37;
+            --shadow-soft: 0 4px 20px rgba(75, 54, 33, 0.08);
+        }
+
+        body {
+            font-family: 'Nunito', 'Noto Serif SC', serif;
+            background-color: var(--color-bg);
+            color: var(--color-text-main);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: var(--shadow-soft);
+        }
+
+        /* 隐私模糊 - 增加全局解锁控制 */
+        .privacy-blur {
+            filter: blur(8px);
+            user-select: none;
+            transition: filter 0.5s ease;
+            pointer-events: none; /* 让点击穿透给 wrapper 处理 */
+        }
+        /* 当处于解锁模式时 */
+        .unlocked-content .privacy-blur {
+            filter: none !important;
+            user-select: text !important;
+            pointer-events: auto;
+        }
+        .unlocked-content .privacy-mask {
+            display: none !important;
+        }
+        .unlocked-content .lock-status-icon {
+            display: block !important; /* 显示开锁图标 */
+        }
+
+        /* 全局解锁模式 */
+        body.unlocked-mode .privacy-blur {
+            filter: none !important;
+            user-select: text !important;
+            pointer-events: auto;
+        }
+        body.unlocked-mode .privacy-mask {
+            display: none !important;
+        }
+
+        .privacy-mask {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            background: rgba(245, 240, 235, 0.3);
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            cursor: pointer;
+        }
+        .privacy-wrapper:hover .privacy-mask {
+            opacity: 1;
+        }
+
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(20px, 1fr));
+            gap: 4px;
+        }
+        .heatmap-cell {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            background-color: #E8E0D5;
+        }
+        .heatmap-cell.active {
+            background-color: var(--color-btn);
+        }
+
+        .btn-coffee {
+            background-color: var(--color-btn);
+            color: #fff;
+            transition: all 0.2s;
+        }
+        .btn-coffee:hover {
+            background-color: #5A3F2C;
+            transform: translateY(-1px);
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #DCCBB3; border-radius: 4px; }
+        
+        /* 卡片内部细滚动条 */
+        .card-scrollbar::-webkit-scrollbar { width: 4px; }
+        .card-scrollbar::-webkit-scrollbar-thumb { background: #E8E0D5; border-radius: 2px; }
+        .card-scrollbar::-webkit-scrollbar-thumb:hover { background: #DCCBB3; }
+
+        /* SweetAlert 小巧化定制 */
+        .swal2-popup.custom-swal-popup {
+            width: 320px !important;
+            padding: 1.5rem !important;
+            font-size: 0.9rem !important;
+            border-radius: 16px !important;
+            background: #FAF7F5 !important;
+        }
+        .swal2-title {
+            font-size: 1.2rem !important;
+            color: #4B3621 !important;
+        }
+        .swal2-input {
+            font-size: 1rem !important;
+            height: 2.5rem !important;
+            margin: 1rem auto !important;
+        }
+        .swal2-actions {
+            margin-top: 1rem !important;
+        }
+
+        /* 分类过滤器滚动条隐藏 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* --- 创意板块：灵感咖啡 CSS --- */
+        .inspiration-card {
+            background: linear-gradient(to bottom right, #ffffff, #FDFBF9);
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+        .coffee-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0) rotate(-3deg); }
+            20%, 80% { transform: translate3d(2px, 0, 0) rotate(3deg); }
+            30%, 50%, 70% { transform: translate3d(-2px, 0, 0) rotate(-3deg); }
+            40%, 60% { transform: translate3d(2px, 0, 0) rotate(3deg); }
+        }
+        .steam-particle {
+            position: absolute;
+            background: #DCCBB3;
+            border-radius: 50%;
+            opacity: 0;
+            filter: blur(3px);
+            animation: steam-up 3s infinite ease-out;
+            width: 8px; 
+            height: 8px;
+        }
+        @keyframes steam-up {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { opacity: 0.6; }
+            100% { transform: translateY(-30px) scale(2); opacity: 0; }
+        }
+
+        input:focus, select:focus, textarea:focus { outline: none; }
+
+        /* 悬浮锁按钮 */
+        .fab-lock {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            background-color: #6F4E37;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(111, 78, 55, 0.3);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 40;
+        }
+        .fab-lock:hover {
+            transform: scale(1.1);
+            background-color: #5A3F2C;
+        }
+        .fab-lock:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+
+    <!-- 顶部导航栏 -->
+    <header class="sticky top-0 z-50 bg-[#F5F0EB]/90 backdrop-blur-md border-b border-[#E8E0D5] px-6 py-3 flex justify-between items-center shadow-sm h-16">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-mug-hot text-xl text-[#6F4E37]"></i>
+            <h1 class="text-xl font-bold tracking-wide text-[#4B3621]">Mindflow</h1>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="openBackupSettings()" class="w-10 h-10 rounded-full hover:bg-[#E8E0D5] text-[#8D7B68] transition flex items-center justify-center" title="备份与设置">
+                <i class="fas fa-cog"></i>
+            </button>
+            <button onclick="openEditor()" class="btn-coffee w-10 h-10 rounded-full shadow-md flex items-center justify-center transition" title="记想法 (Ctrl+Space)">
+                <i class="fas fa-pen"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="container mx-auto max-w-6xl px-4 mt-6">
+        
+        <!-- 顶部双栏布局：热力图 + 灵感咖啡馆 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- 左侧：热力图 -->
+            <section class="glass-card p-5 animate-fade-in-up flex flex-col h-52 relative">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex flex-col">
+                        <h2 class="text-base font-bold text-[#4B3621]">思维足迹</h2>
+                        <div class="mt-3 text-sm text-[#8D7B68] font-serif italic leading-loose">
+                            “收起无谓的情绪，把能量留给生长。<br>
+                            无需追逐光，专注于擦亮自己的星芒。<br>
+                            在无人问津处深耕，自有万物为你回响。”
+                        </div>
+                    </div>
+                    <div class="text-[10px] text-[#8D7B68] flex flex-col items-end">
+                        <span id="currentDateStr" class="mb-1 opacity-70">Loading...</span>
+                        <div>
+                            <span class="inline-block w-2 h-2 bg-[#E8E0D5] rounded-sm mr-1"></span>空
+                            <span class="inline-block w-2 h-2 bg-[#6F4E37] rounded-sm ml-1 mr-1"></span>记
+                        </div>
+                    </div>
+                </div>
+                <div id="heatmap" class="heatmap-grid flex-1 content-end mt-2">
+                    <!-- JS生成 -->
+                </div>
+            </section>
+
+            <!-- 右侧：灵感咖啡馆 -->
+            <section class="glass-card inspiration-card p-6 h-52 flex flex-col items-center justify-center text-center relative overflow-hidden group shadow-lg hover:shadow-xl transition-all">
+                <div class="absolute top-[-20px] right-[-20px] text-[#6F4E37] opacity-5 transform rotate-12">
+                    <i class="fas fa-coffee text-9xl"></i>
+                </div>
+                <div class="z-10 flex flex-col items-center w-full">
+                    <div class="relative mb-4 cursor-pointer" id="coffeeIconContainer" onclick="brewInspiration(event)" title="点击切换一句灵感">
+                        <i class="fas fa-mug-hot text-5xl text-[#6F4E37] transition-transform duration-300 group-hover:scale-110" id="coffeeIcon"></i>
+                        <div class="steam-particle" style="top: -10px; left: 10px; animation-delay: 0s;"></div>
+                        <div class="steam-particle" style="top: -15px; left: 25px; animation-delay: 1s;"></div>
+                        <div class="steam-particle" style="top: -8px; left: 40px; animation-delay: 0.5s;"></div>
+                    </div>
+                    <h3 class="text-[#4B3621] font-bold text-lg mb-1 transition-all select-none" id="brewTitle">灵感咖啡馆</h3>
+                    <p class="text-[#8D7B68] text-sm max-w-[80%] mx-auto transition-all duration-500 leading-relaxed min-h-[40px] flex items-center justify-center cursor-pointer hover:text-[#6F4E37] hover:underline decoration-dotted underline-offset-4" id="brewText" onclick="useInspiration(event)" title="点击以此灵感开始书写">
+                        点击上方咖啡杯，萃取今日话题
+                    </p>
+                </div>
+            </section>
+        </div>
+
+        <!-- 过滤器 -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex gap-2 overflow-x-auto no-scrollbar w-full" id="categoryFilterContainer">
+                <!-- 动态生成按钮 -->
+            </div>
+            <!-- 原来的全局锁按钮移到了悬浮按钮，这里保持布局整洁或移除 -->
+        </div>
+
+        <!-- 列表区域：一行三个 -->
+        <div id="entriesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <!-- JS生成卡片 -->
+        </div>
+
+        <!-- 空状态 -->
+        <div id="emptyState" class="hidden text-center py-20 opacity-50 col-span-full">
+            <i class="fas fa-feather text-4xl mb-4 text-[#C8B6A6]"></i>
+            <p>还没有记录想法，按下 Ctrl+Space 开始吧...</p>
+        </div>
+    </main>
+    
+    <!-- 悬浮锁按钮：一键上锁 -->
+    <div class="fab-lock" onclick="lockAll()" title="一键上锁" id="fabLockBtn">
+        <i class="fas fa-lock text-xl"></i>
+    </div>
+
+    <!-- 编辑/新建模态框 -->
+    <div id="editorModal" class="fixed inset-0 z-[60] hidden">
+        <div class="absolute inset-0 bg-[#4B3621]/20 backdrop-blur-sm transition-opacity" onclick="tryCloseEditor()"></div>
+        
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-xl bg-[#FDFBF9] rounded-2xl shadow-2xl overflow-hidden scale-95 transition-transform duration-300 flex flex-col max-h-[90vh]" id="editorCard">
+            <div class="p-5 border-b border-[#E8E0D5] flex justify-between items-center bg-[#FAF7F5]">
+                <h3 class="text-lg font-bold text-[#4B3621]" id="modalTitle">记录此刻</h3>
+                <div class="text-xs text-[#8D7B68] flex gap-3 items-center">
+                    <span class="hidden sm:inline"><kbd class="bg-[#E8E0D5] px-1 rounded">Ctrl+S</kbd> 保存</span>
+                    <span class="hidden sm:inline"><kbd class="bg-[#E8E0D5] px-1 rounded">Esc</kbd> 退出</span>
+                    <button onclick="tryCloseEditor()" class="text-[#A4907C] hover:text-[#4B3621] text-lg ml-2"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+
+            <div class="p-6 overflow-y-auto custom-scrollbar">
+                <form id="entryForm" onsubmit="saveEntry(event)">
+                    <input type="hidden" id="entryId">
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-[#8D7B68] mb-1 uppercase">主题</label>
+                            <select id="inputCategory" class="w-full bg-[#F5F0EB] rounded px-3 py-2 text-sm text-[#4B3621] outline-none focus:ring-1 focus:ring-[#A4907C]">
+                                <!-- JS填充 -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-[#8D7B68] mb-1 uppercase">心情</label>
+                            <select id="inputMood" class="w-full bg-[#F5F0EB] rounded px-3 py-2 text-sm text-[#4B3621] outline-none focus:ring-1 focus:ring-[#A4907C]">
+                                <option value="calm">☕ 平静</option>
+                                <option value="happy">😊 开心</option>
+                                <option value="excited">🔥 兴奋</option>
+                                <option value="anxious">🌪️ 焦虑</option>
+                                <option value="sad">🌧️ 低落</option>
+                                <option value="tired">😫 疲惫</option>
+                                <option value="grateful">🙏 感恩</option>
+                                <option value="lost">🧭 迷茫</option>
+                                <option value="confident">✨ 自信</option>
+                                <option value="angry">💢 愤怒</option>
+                                <option value="touched">🥺 感动</option>
+                                <option value="lonely">🍂 孤单</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <input type="text" id="inputTitle" required placeholder="标题..." 
+                            class="w-full bg-transparent border-b-2 border-[#E8E0D5] px-2 py-2 text-xl font-bold text-[#4B3621] placeholder-[#DCCBB3] focus:border-[#A4907C] outline-none transition">
+                    </div>
+
+                    <div class="mb-2">
+                        <textarea id="inputContent" rows="8" required placeholder="这一刻的想法..." 
+                            class="w-full bg-[#F5F0EB] rounded-lg px-4 py-3 text-[#4B3621] placeholder-[#DCCBB3] outline-none focus:ring-1 focus:ring-[#A4907C] resize-none leading-relaxed custom-scrollbar"></textarea>
+                    </div>
+                </form>
+            </div>
+
+            <div class="p-4 border-t border-[#E8E0D5] bg-[#FAF7F5] flex justify-between items-center">
+                <span class="text-xs text-[#8D7B68]" id="editorTimeDisplay"></span>
+                <button type="button" onclick="document.getElementById('entryForm').requestSubmit()" class="btn-coffee px-6 py-2 rounded-lg shadow-sm font-bold text-sm">
+                    保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CATEGORIES = ["灵感", "亲情", "爱情", "未来", "社会", "自我", "情绪"];
+        const APP_KEY = 'mindflow_data_v2';
+        const SETTINGS_KEY = 'mindflow_settings_v2';
+        
+        const PROMPTS = [
+            "描述此刻窗外的光线是什么样子的？", "如果你的心情是一种颜色，现在是什么色？", "最近让你会心一笑的小事是什么？", "如果现在能去任何地方，你想去哪？",
+            "写下一个你想念的人的名字。", "此时此刻，你听到了什么声音？", "最近单曲循环的一首歌是什么？", "用三个形容词描述今天的自己。",
+            "有什么事情是你一直想做但还没做的？", "今天发生的哪件事让你觉得很美好？", "如果生活是一部电影，现在是哪一幕？", "童年记忆里最深刻的味道是什么？",
+            "假如明天就是世界末日，今晚你会吃什么？", "你最近一次哭泣是因为什么？", "写下一句你想对5年前的自己说的话。", "你最喜欢的季节是哪个？为什么？",
+            "描述一个让你感到无比安全的瞬间。", "如果可以拥有一种超能力，你希望是什么？", "你理想中的完美一天是怎样度过的？", "最近读到或听到的一句很有感触的话。",
+            "你现在最需要的安慰是什么？", "如果你是一棵树，你想长在哪里？", "记录一个让你后悔的瞬间，然后试着原谅自己。", "你最想学会的一项新技能是什么？",
+            "描述你最好朋友的一个可爱之处。", "今晚的月亮看起来怎么样？", "如果你的宠物会说话，它会说什么？", "写下一件让你感到骄傲的小成就。",
+            "你最近做的一个奇怪的梦。", "如果可以和一位历史人物共进晚餐，你会选谁？", "你最喜欢的一件衣服是什么样子的？", "描述一种让你感到宁静的气味。",
+            "你对“家”的定义是什么？", "如果把生活比作一本书，现在的章节名叫什么？", "写下三个你感激的人或事。", "你最害怕失去的是什么？",
+            "如果可以重来，你会改变哪一个决定？", "你觉得自己最大的优点是什么？", "描述你梦想中的房子。", "最近一次让你开怀大笑是在什么时候？",
+            "你最喜欢的节日是什么？", "如果可以给全世界的人发一条短信，你会写什么？", "你此时此刻的身体感受如何？", "写下一个你还没去过但很想去的地方。",
+            "你觉得爱是什么？", "最近让你感到焦虑的一件事，并试着分析它。", "你最喜欢的一部电影结局。", "如果不用考虑钱，你最想从事什么工作？",
+            "写给未来自己的一封短信。", "此时此刻，你最想喝的一杯饮品是什么？", "观察身边的一件物品，详细描述它的纹理和光泽。"
+        ];
+
+        let entries = [];
+        let settings = { password: '1234', lastBackup: null };
+        let isGlobalUnlocked = false; 
+        let isFormDirty = false;
+        let currentPromptText = "";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            initCategories();
+            renderHeatmap();
+            renderEntries();
+            updateDateHeader();
+            updateLockBtnUI();
+            
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.code === 'Space') { e.preventDefault(); openEditor(); }
+                if (e.ctrlKey && e.key === 's' && !document.getElementById('editorModal').classList.contains('hidden')) {
+                    e.preventDefault(); document.getElementById('entryForm').requestSubmit();
+                }
+                if (e.key === 'Escape' && !document.getElementById('editorModal').classList.contains('hidden')) {
+                    if (!Swal.isVisible()) tryCloseEditor();
+                }
+            });
+
+            document.querySelectorAll('#entryForm input, #entryForm textarea, #entryForm select').forEach(input => {
+                input.addEventListener('input', () => { isFormDirty = true; });
+            });
+        });
+
+        function brewInspiration(event) {
+            if(event) event.stopPropagation();
+            const iconContainer = document.getElementById('coffeeIconContainer');
+            const text = document.getElementById('brewText');
+            const title = document.getElementById('brewTitle');
+
+            iconContainer.classList.add('coffee-shake');
+            setTimeout(() => iconContainer.classList.remove('coffee-shake'), 500);
+
+            text.style.opacity = '0';
+            setTimeout(() => {
+                const prompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+                currentPromptText = prompt;
+                title.innerText = "今日特调灵感";
+                title.classList.add('text-[#6F4E37]');
+                text.innerText = prompt;
+                text.style.opacity = '1';
+                text.classList.add('font-bold', 'text-[#4B3621]');
+                text.classList.remove('text-[#8D7B68]');
+            }, 300);
+        }
+
+        function useInspiration(event) {
+            if(event) event.stopPropagation();
+            if (!currentPromptText) { brewInspiration(); return; }
+            openEditor(null, currentPromptText);
+        }
+
+        function initCategories() {
+            const select = document.getElementById('inputCategory');
+            select.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const container = document.getElementById('categoryFilterContainer');
+            let html = `<button onclick="filterEntries('all')" class="category-btn active px-4 py-1.5 rounded-full bg-[#6F4E37] text-white text-xs whitespace-nowrap shadow-sm transition hover:opacity-90">全部</button>`;
+            CATEGORIES.forEach(c => {
+                html += `<button onclick="filterEntries('${c}')" class="category-btn px-4 py-1.5 rounded-full bg-white text-[#6F4E37] text-xs whitespace-nowrap shadow-sm border border-[#E8E0D5] hover:bg-[#F5F0EB] transition ml-2">${c}</button>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function loadData() {
+            const storedEntries = localStorage.getItem(APP_KEY);
+            const storedSettings = localStorage.getItem(SETTINGS_KEY);
+            if (storedEntries) entries = JSON.parse(storedEntries);
+            if (storedSettings) settings = JSON.parse(storedSettings);
+        }
+
+        function saveData() {
+            localStorage.setItem(APP_KEY, JSON.stringify(entries));
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            renderHeatmap();
+            renderEntries();
+        }
+
+        function openEditor(id = null, initialContent = "") {
+            const modal = document.getElementById('editorModal');
+            const card = document.getElementById('editorCard');
+            const title = document.getElementById('modalTitle');
+            const form = document.getElementById('entryForm');
+            const timeDisplay = document.getElementById('editorTimeDisplay');
+
+            form.reset();
+            isFormDirty = false;
+            document.getElementById('entryId').value = '';
+            
+            const now = new Date();
+            timeDisplay.innerText = now.toLocaleString('zh-CN', { hour12: false });
+
+            // 编辑逻辑
+            if (id) {
+                const entry = entries.find(e => e.id === id);
+                if (entry) {
+                    document.getElementById('entryId').value = entry.id;
+                    document.getElementById('inputTitle').value = entry.title;
+                    document.getElementById('inputCategory').value = entry.category;
+                    document.getElementById('inputMood').value = entry.mood;
+                    document.getElementById('inputContent').value = entry.content;
+                    title.innerText = '编辑想法';
+                    showModal();
+                }
+            } else {
+                title.innerText = '记录此刻';
+                if (initialContent) {
+                    document.getElementById('inputContent').value = initialContent + "\n\n";
+                    setTimeout(() => {
+                        const ta = document.getElementById('inputContent');
+                        ta.focus();
+                        ta.setSelectionRange(ta.value.length, ta.value.length);
+                    }, 100);
+                }
+                showModal();
+                if (!initialContent) setTimeout(() => document.getElementById('inputTitle').focus(), 100);
+            }
+
+            function showModal() {
+                modal.classList.remove('hidden');
+                setTimeout(() => { card.classList.remove('scale-95'); card.classList.add('scale-100'); }, 10);
+            }
+        }
+
+        function tryCloseEditor() {
+            if (isFormDirty) {
+                Swal.fire({
+                    title: '未保存', text: "要保存这份草稿吗？", icon: 'question',
+                    showCancelButton: true, showDenyButton: true, confirmButtonText: '保存', denyButtonText: '不保存', cancelButtonText: '取消',
+                    confirmButtonColor: '#6F4E37', denyButtonColor: '#8D7B68', customClass: { popup: 'custom-swal-popup' }
+                }).then((result) => {
+                    if (result.isConfirmed) document.getElementById('entryForm').requestSubmit();
+                    else if (result.isDenied) forceCloseEditor();
+                });
+            } else {
+                forceCloseEditor();
+            }
+        }
+
+        function forceCloseEditor() {
+            const modal = document.getElementById('editorModal');
+            const card = document.getElementById('editorCard');
+            card.classList.remove('scale-100');
+            card.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 200);
+        }
+
+        function saveEntry(e) {
+            e.preventDefault();
+            const id = document.getElementById('entryId').value;
+            const title = document.getElementById('inputTitle').value;
+            const category = document.getElementById('inputCategory').value;
+            const mood = document.getElementById('inputMood').value;
+            const content = document.getElementById('inputContent').value;
+            const now = new Date().getTime();
+
+            if (id) {
+                entries = entries.filter(e => e.id !== id);
+                entries.unshift({ id, title, category, mood, content, timestamp: now }); // 更新时间并置顶
+            } else {
+                entries.unshift({
+                    id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+                    title, category, mood, content, timestamp: now
+                });
+            }
+
+            isFormDirty = false;
+            saveData();
+            forceCloseEditor();
+            
+            const Toast = Swal.mixin({
+                toast: true, position: 'top-end', showConfirmButton: false, timer: 2000,
+                background: '#4B3621', color: '#fff', customClass: { popup: 'custom-swal-popup' }
+            });
+            Toast.fire({ icon: 'success', title: '已记录' });
+        }
+
+        // --- 锁与交互逻辑 ---
+        
+        function lockAll() {
+            // 如果已经是全局上锁状态，且所有卡片都锁住了，这里其实没啥变化
+            // 如果是全局解锁状态，则关闭全局解锁
+            if (isGlobalUnlocked) {
+                isGlobalUnlocked = false;
+                document.body.classList.remove('unlocked-mode');
+            }
+            
+            // 重新渲染列表以确保所有个体锁也重置（虽然CSS控制了大半，但重新渲染最稳妥）
+            // 另外要移除所有卡片上手动解锁的类
+            const unlockedCards = document.querySelectorAll('.unlocked-content');
+            unlockedCards.forEach(card => card.classList.remove('unlocked-content'));
+
+            updateLockBtnUI();
+            
+            const Toast = Swal.mixin({
+                toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500,
+                background: '#4B3621', color: '#fff', customClass: { popup: 'custom-swal-popup' }
+            });
+            Toast.fire({ icon: 'success', title: '已全部上锁' });
+        }
+
+        // 处理卡片点击：空白处/内容处
+        function handleCardClick(id, event, cardElement) {
+            // 如果点击的是操作按钮，不处理
+            if (event.target.closest('button') || event.target.closest('.lock-status-icon')) return;
+
+            // 检查是否已解锁
+            const isUnlocked = isGlobalUnlocked || cardElement.querySelector('.privacy-wrapper').classList.contains('unlocked-content');
+            
+            if (isUnlocked) {
+                // 已解锁状态：点击进入编辑
+                openEditor(id);
+            } else {
+                // 未解锁状态：点击解锁
+                unlockEntry(id, cardElement.querySelector('.privacy-wrapper'));
+            }
+        }
+
+        // 单个解锁/上锁逻辑
+        function unlockEntry(id, wrapperElement) {
+            if (isGlobalUnlocked) return; // 全局解锁时不需要单独解
+            if (wrapperElement.classList.contains('unlocked-content')) return; // 已经解了
+
+            checkPassword(() => {
+                wrapperElement.classList.add('unlocked-content');
+            });
+        }
+
+        function reLockEntry(event, wrapperElement) {
+            event.stopPropagation(); // 防止冒泡触发编辑或解锁
+            wrapperElement.classList.remove('unlocked-content');
+        }
+
+        function updateLockBtnUI() {
+            const fab = document.getElementById('fabLockBtn');
+            // 如果当前是全局解锁状态，或者是部分解锁，按钮都可用
+            // 这里我们保持按钮一直可用，点击就是“一键锁屏”的效果
+        }
+
+        function checkPassword(callback) {
+            Swal.fire({
+                title: '请输入密码', input: 'password', inputAttributes: { autocapitalize: 'off' },
+                showCancelButton: true, confirmButtonText: '确认', confirmButtonColor: '#6F4E37', cancelButtonColor: '#A4907C',
+                customClass: { popup: 'custom-swal-popup' },
+                preConfirm: (password) => {
+                    if (password === settings.password) return true;
+                    else Swal.showValidationMessage('密码错误');
+                }
+            }).then((result) => {
+                if (result.isConfirmed) callback();
+            });
+        }
+
+        function deleteEntry(id, event) {
+            event.stopPropagation();
+            const doDelete = () => {
+                Swal.fire({
+                    title: '确定删除?', icon: 'warning', showCancelButton: true,
+                    confirmButtonColor: '#6F4E37', confirmButtonText: '删除', customClass: { popup: 'custom-swal-popup' }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        entries = entries.filter(e => e.id !== id);
+                        saveData();
+                    }
+                });
+            };
+            // 只有在解锁状态下才能删除，或者输入密码
+            if (isGlobalUnlocked) doDelete();
+            else checkPassword(doDelete);
+        }
+
+        // --- 渲染 ---
+        function renderHeatmap() {
+            const container = document.getElementById('heatmap');
+            container.innerHTML = '';
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const activeDays = new Set();
+            entries.forEach(e => {
+                const date = new Date(e.timestamp);
+                if (date.getFullYear() === year && date.getMonth() === month) activeDays.add(date.getDate());
+            });
+            for (let i = 1; i <= daysInMonth; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'heatmap-cell relative group';
+                if (activeDays.has(i)) cell.classList.add('active');
+                cell.title = `${month + 1}月${i}日`;
+                container.appendChild(cell);
+            }
+        }
+
+        function renderEntries(filterType = 'all') {
+            const list = document.getElementById('entriesList');
+            list.innerHTML = '';
+
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                const isActive = filterType === 'all' ? btn.innerText === '全部' : btn.innerText === filterType;
+                btn.className = isActive 
+                    ? 'category-btn active px-4 py-1.5 rounded-full bg-[#6F4E37] text-white text-xs whitespace-nowrap shadow-sm transition hover:opacity-90 ml-2 first:ml-0'
+                    : 'category-btn px-4 py-1.5 rounded-full bg-white text-[#6F4E37] text-xs whitespace-nowrap shadow-sm border border-[#E8E0D5] hover:bg-[#F5F0EB] transition ml-2 first:ml-0';
+            });
+
+            const filteredEntries = filterType === 'all' ? entries : entries.filter(e => e.category === filterType);
+
+            if (filteredEntries.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('emptyState').classList.add('hidden');
+
+            filteredEntries.forEach(entry => {
+                const date = new Date(entry.timestamp);
+                const dateStr = `${date.getMonth()+1}/${date.getDate()}`;
+                const timeStr = `${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+                
+                const moodIcons = { 
+                    'calm': 'fa-coffee', 'happy': 'fa-smile', 'anxious': 'fa-wind', 'sad': 'fa-cloud-rain', 
+                    'excited': 'fa-fire', 'tired': 'fa-bed', 'grateful': 'fa-praying-hands', 'lost': 'fa-compass',
+                    'confident': 'fa-star', 'angry': 'fa-bolt', 'touched': 'fa-heart', 'lonely': 'fa-leaf'
+                };
+                
+                const card = document.createElement('div');
+                card.className = 'glass-card p-5 relative group transition hover:shadow-lg flex flex-col h-full animate-fade-in cursor-pointer';
+                // 添加卡片点击事件
+                card.onclick = (e) => handleCardClick(entry.id, e, card);
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-[#F5F0EB] text-[#6F4E37] px-2 py-0.5 rounded text-[10px] font-bold">${entry.category}</span>
+                            <span class="text-[#8D7B68] text-xs"><i class="fas ${moodIcons[entry.mood] || 'fa-circle'} mr-1"></i>${dateStr} ${timeStr}</span>
+                        </div>
+                        <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                            <button onclick="deleteEntry('${entry.id}', event)" class="text-[#8D7B68] hover:text-red-500 text-xs px-2" title="删除"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-lg font-bold text-[#4B3621] mb-2 truncate" title="${entry.title}">${entry.title}</h3>
+                    
+                    <div class="privacy-wrapper relative flex-1 bg-[#F9F7F5] rounded-lg border border-[#E8E0D5] p-3 transition-colors">
+                        <!-- 右上角锁图标：未解锁时显示闭锁，已解锁时显示开锁按钮 -->
+                        <div class="absolute top-2 right-2 text-[#8D7B68] lock-icon pointer-events-none group-hover:opacity-100 opacity-50 transition-opacity">
+                            <i class="fas fa-lock text-[10px]"></i>
+                        </div>
+                        
+                        <!-- 单独上锁按钮 (默认隐藏，解锁后显示) -->
+                        <button class="absolute top-1 right-1 w-6 h-6 rounded-full bg-[#E8E0D5] hover:bg-[#DCCBB3] text-[#6F4E37] flex items-center justify-center shadow-sm z-20 lock-status-icon hidden" 
+                                onclick="reLockEntry(event, this.parentElement)" title="点击上锁">
+                            <i class="fas fa-lock-open text-[10px]"></i>
+                        </button>
+
+                        <!-- 内容区域：增加 overflow-y-auto 和 card-scrollbar -->
+                        <div class="privacy-blur text-[#4B3621] text-sm leading-relaxed whitespace-pre-wrap h-[100px] overflow-y-auto card-scrollbar pr-1">${entry.content}</div>
+                        
+                        <div class="privacy-mask">
+                            <i class="fas fa-key text-[#6F4E37] text-xl"></i>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function updateDateHeader() {
+            const now = new Date();
+            document.getElementById('currentDateStr').innerText = now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+        }
+        
+        function filterEntries(type) { renderEntries(type); }
+
+        function openBackupSettings() {
+            Swal.fire({
+                title: '设置',
+                html: `
+                    <div class="flex flex-col gap-2 text-left">
+                        <button onclick="changePassword()" class="w-full text-left px-4 py-2 bg-white border border-[#E8E0D5] rounded hover:bg-[#F5F0EB] text-[#4B3621] text-sm"><i class="fas fa-key w-5 text-center mr-2"></i> 修改密码</button>
+                        <button onclick="exportData()" class="w-full text-left px-4 py-2 bg-white border border-[#E8E0D5] rounded hover:bg-[#F5F0EB] text-[#4B3621] text-sm"><i class="fas fa-download w-5 text-center mr-2"></i> 导出备份</button>
+                        <label class="w-full text-left px-4 py-2 bg-white border border-[#E8E0D5] rounded hover:bg-[#F5F0EB] text-[#4B3621] text-sm cursor-pointer"><i class="fas fa-upload w-5 text-center mr-2"></i> 恢复备份<input type="file" id="importFile" class="hidden" onchange="importData(this)"></label>
+                    </div>
+                `,
+                showConfirmButton: false, showCloseButton: true, customClass: { popup: 'custom-swal-popup' }
+            });
+        }
+
+        function changePassword() {
+            Swal.fire({
+                title: '修改密码', html: '<input id="oldPass" class="swal2-input" placeholder="旧密码" type="password"><input id="newPass" class="swal2-input" placeholder="新密码" type="password">',
+                confirmButtonColor: '#6F4E37', confirmButtonText: '修改', customClass: { popup: 'custom-swal-popup' },
+                preConfirm: () => [document.getElementById('oldPass').value, document.getElementById('newPass').value]
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const [old, newP] = result.value;
+                    if (old === settings.password && newP) { settings.password = newP; saveData(); Swal.fire({ icon: 'success', title: '修改成功', timer: 1500, showConfirmButton: false, customClass: { popup: 'custom-swal-popup' }}); }
+                    else { Swal.fire({ icon: 'error', title: '失败', text: '旧密码错误或新密码为空', customClass: { popup: 'custom-swal-popup' }}); }
+                }
+            });
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({entries, settings}));
+            const a = document.createElement('a'); a.href = dataStr; a.download = `mindflow_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
+        }
+
+        function importData(input) {
+            const file = input.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.entries) { entries = data.entries; saveData(); location.reload(); }
+                } catch { Swal.fire('文件无效'); }
+            }; reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
